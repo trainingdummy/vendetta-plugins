@@ -2,6 +2,6 @@
 This repo contains a template for creating [Vendetta](https://github.com/vendetta-mod/Vendetta) plugins.
 
 # How to install?
-Paste a plugin URL into the Plugins page of Vendetta, following a basic format of:
+Paste the plugin URL into the Plugins page of Vendetta, following a format of:
 
-https://`YOUR_GITHUB_USERNAME`.github.io/`REPO_NAME`/`PLUGIN_NAME`
+https://trainingdummy.github.io/vendetta-plugins/hidden-channel
