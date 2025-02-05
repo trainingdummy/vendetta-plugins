@@ -1,9 +1,9 @@
 {
     "name": "Hidden Channels Fix",
-    "description": "Reworked from C10udburst's original script.",
+    "description": "Reworked from cloudburst's original script.",
     "authors": [
         {
-            "name": "C10udburst, Training Dummy",
+            "name": "cloudburst, Training Dummy",
             "id": "601137505739472908"
         }
     ],
