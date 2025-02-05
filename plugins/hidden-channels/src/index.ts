@@ -39,39 +39,29 @@ function onLoad() {
         console.error("Hidden Channels plugin: 'ChannelMessages' module not found.");
         return;
     }
-    
-    console.log("[Hidden Channels Debug] ChannelMessages:", ChannelMessages);
-
-    // Patching methods for controlling behavior
-    patches.push(after("can", Permissions, ([permID, channel], res) => {
-        if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
-        return res;
-    }));
-
-    patches.push(instead("transitionToGuild", Router, (args, orig) => {
-        const [_, channel] = args;
-        if (!isHidden(channel) && typeof orig === "function") orig(args);
-    }));
-
-    patches.push(instead("fetchMessages", Fetcher, (args, orig) => {
-        const [channel] = args;
-        if (!isHidden(channel) && typeof orig === "function") orig(args);
-    }));
 
     patches.push(instead("default", ChannelMessages, (args, orig) => {
         const channel = args[0]?.channel;
         if (!isHidden(channel) && typeof orig === "function") return orig(...args);
-        
-        // Remove unread formatting and set to dark gray
-        const style = {
-            color: mutedColor,
-            opacity: 0.6, // optional: to make it appear dimmer, like muted channels
-        };
 
+        // Apply muted channel class and padlock icon to hidden channels
         return React.createElement(HiddenChannel, {
             channel,
-            icon: "ic_lock",  // Use padlock icon instead of locked # icon
-            style,            // Apply muted gray styling
+            className: 'modeMuted__2ea32', // Apply muted channel class
+            children: [
+                // Replace lock icon with a padlock icon
+                React.createElement('svg', {
+                    className: 'ic_lock', // This is the padlock icon
+                    viewBox: '0 0 24 24',
+                    width: '24',
+                    height: '24',
+                    fill: 'none'
+                }, 
+                React.createElement('path', {
+                    fill: 'currentColor',
+                    d: 'M18 10v4h-2V7a4 4 0 0 0-8 0v7H6a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1h-2zM12 7a2 2 0 0 1 2 2v7h-4V9a2 2 0 0 1 2-2z'
+                }))
+            ]
         });
     }));
 }
