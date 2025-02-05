@@ -1,6 +1,7 @@
 import { findByName, findByProps, instead, after } from "@vendetta/patcher";
 import { constants, React } from "@vendetta/metro/common";
 import HiddenChannel from "./HiddenChannel";
+import { lazyDestructure, findByProps } from "@vendetta/metro";
 
 let patches: Array<() => void> = [];
 
@@ -39,73 +40,44 @@ function isHidden(channel: any | undefined): boolean {
  * We search for candidate modules, and if one is found, patch its render.
  * If none is found, we log an error but do not disable the plugin.
  */
+
 function onLoad() {
-  // List candidate names to try (prioritizing those we suspect).
-  const candidates = [
-    "MessagesWrapperConnected",
-    "ChannelReader",
-    "MessagesList",
-    "ChannelMessages"
-  ];
-  let targetComponent = null;
-  for (const name of candidates) {
-    targetComponent = findByName(name, false);
-    if (targetComponent) {
-      console.log(`Hidden Channels plugin: Found candidate component: ${name}`);
-      break;
-    } else {
-      console.log(`Hidden Channels plugin: Candidate ${name} not found.`);
-    }
-  }
-  
-  if (!targetComponent) {
-    console.error("Hidden Channels plugin: No suitable messages component found. Plugin enabled but will not patch UI.");
-  } else {
-    patches.push(
-      instead("default", targetComponent, (args, orig) => {
-        const channel = args[0]?.channel;
-        if (!isHidden(channel) && typeof orig === "function") {
-          return orig(...args);
+    const candidates = [
+        "MessagesWrapperConnected",
+        "ChannelReader",
+        "MessagesList",
+        "ChannelMessages"
+    ];
+    
+    let targetComponent = null;
+
+    for (const name of candidates) {
+        targetComponent = lazyDestructure(() => findByProps(name));
+        if (targetComponent) {
+            console.log(`Hidden Channels plugin: Found candidate component: ${name}`);
+            break;
         } else {
-          console.log("Hidden Channels plugin: Rendering HiddenChannel UI for channel:", channel?.id);
-          return React.createElement(HiddenChannel, { channel });
+            console.log(`Hidden Channels plugin: Candidate ${name} not found.`);
         }
-      })
-    );
-  }
+    }
 
-  // Patch Permissions.can to force view permission when not in a real check.
-  patches.push(
-    after("can", Permissions, ([permID, channel], res) => {
-      if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
-      return res;
-    })
-  );
-
-  // Patch Router.transitionToGuild to block navigation if the channel is hidden.
-  patches.push(
-    instead("transitionToGuild", Router, (args, orig) => {
-      const [_, channel] = args;
-      if (!isHidden(channel) && typeof orig === "function") {
-        orig(args);
-      } else {
-        console.log("Hidden Channels plugin: Blocked navigation to hidden channel:", channel?.id);
-      }
-    })
-  );
-
-  // Patch Fetcher.fetchMessages to block message fetching for hidden channels.
-  patches.push(
-    instead("fetchMessages", Fetcher, (args, orig) => {
-      const [channel] = args;
-      if (!isHidden(channel) && typeof orig === "function") {
-        orig(args);
-      } else {
-        console.log("Hidden Channels plugin: Blocked fetching messages for hidden channel:", channel?.id);
-      }
-    })
-  );
+    if (!targetComponent) {
+        console.error("Hidden Channels plugin: No suitable messages component found. Plugin enabled but will not patch UI.");
+    } else {
+        patches.push(
+            instead("default", targetComponent, (args, orig) => {
+                const channel = args[0]?.channel;
+                if (!isHidden(channel) && typeof orig === "function") {
+                    return orig(...args);
+                } else {
+                    console.log("Hidden Channels plugin: Rendering HiddenChannel UI for channel:", channel?.id);
+                    return React.createElement(HiddenChannel, { channel });
+                }
+            })
+        );
+    }
 }
+
 
 /**
  * onUnload unpatches all applied patches.
