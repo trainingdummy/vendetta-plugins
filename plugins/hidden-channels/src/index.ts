@@ -30,6 +30,9 @@ function isHidden(channel: any | undefined) {
     return res;
 }
 
+// Define the dark gray color used for muted channels
+const mutedColor = "#72767d";  // Typically, muted channels use a gray like this
+
 function onLoad() {
     const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
     if (!ChannelMessages) {
@@ -58,7 +61,18 @@ function onLoad() {
     patches.push(instead("default", ChannelMessages, (args, orig) => {
         const channel = args[0]?.channel;
         if (!isHidden(channel) && typeof orig === "function") return orig(...args);
-        else return React.createElement(HiddenChannel, {channel});
+        
+        // Remove unread formatting and set to dark gray
+        const style = {
+            color: mutedColor,
+            opacity: 0.6, // optional: to make it appear dimmer, like muted channels
+        };
+
+        return React.createElement(HiddenChannel, {
+            channel,
+            icon: "ic_lock",  // Use padlock icon instead of locked # icon
+            style,            // Apply muted gray styling
+        });
     }));
 }
 
