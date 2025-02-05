@@ -1,74 +1,91 @@
 import { findByName, findByProps } from "@vendetta/metro";
-import { instead } from "@vendetta/patcher";
+import { constants, React } from "@vendetta/metro/common";
+import { instead, after } from "@vendetta/patcher";
 import HiddenChannel from "./HiddenChannel";
 
 let patches = [];
 
-const possibleModules = [
-    "MessagesWrapperConnected",
-    "ChannelMessages",
-    "MessageActionCreators",
-    "MessagePreviewStore",
-    "GuildBasicChannels",
-    "ChannelStore"
+const Permissions = findByProps("getChannelPermissions", "can");
+const Router = findByProps("transitionToGuild");
+const Fetcher = findByProps("stores", "fetchMessages");
+const { ChannelTypes } = findByProps("ChannelTypes");
+const { getChannel } = findByProps("getChannel");
+
+const skipChannels = [
+    ChannelTypes.DM, 
+    ChannelTypes.GROUP_DM, 
+    ChannelTypes.GUILD_CATEGORY
 ];
 
-// Function to find the module safely
-function findModule(moduleNames: string[]) {
-    for (const mod of moduleNames) {
-        const found = vendetta.modules.findByName(mod, false) || vendetta.modules.findByProps(mod);
-        console.log(`[Hidden Channels Debug] ${mod}:`, found);
-    }
+function isHidden(channel: any | undefined) {
+    if (channel == undefined) return false;
+    if (typeof channel === 'string')
+        channel = getChannel(channel);
+    if (!channel || skipChannels.includes(channel.type)) return false;
+
+    channel.realCheck = true;
+    const res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
+    delete channel.realCheck;
+    return res;
 }
 
 export function onLoad() {
-    // Find modules
-    findModule(possibleModules);
+    console.log("[Hidden Channels Debug] onLoad started");
 
-    setTimeout(() => {
-        const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
+    // Find and log the ChannelMessages module (check for hidden channels here)
+    const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
+    if (ChannelMessages) {
+        console.log("[Hidden Channels Debug] ChannelMessages found");
 
-        if (ChannelMessages) {
-            console.log("[Hidden Channels Debug] ChannelMessages found ✅");
+        const _channelMessages = ChannelMessages?.default?._channelMessages;
+        if (_channelMessages) {
+            const channelIds = Object.keys(_channelMessages);
+            console.log("[Hidden Channels Debug] Channel IDs found:", channelIds);
 
-            // Access the _channelMessages object
-            const _channelMessages = ChannelMessages.default?._channelMessages;
-            if (_channelMessages) {
-                const channelIds = Object.keys(_channelMessages);
-                console.log("[Hidden Channels Debug] Channel IDs found:", channelIds);
-
-                // Check for hidden channels and render HiddenChannel UI
-                for (const channelId of channelIds) {
-                    const channel = _channelMessages[channelId];
-                    if (isHidden(channel)) {
-                        console.log("[Hidden Channels Debug] Hidden channel found:", channelId);
-                        // Apply your logic to render the HiddenChannel UI for the hidden channel
-                        renderHiddenChannelUI(channel);
-                    }
+            // Loop through channel IDs and check for hidden ones
+            for (const channelId of channelIds) {
+                const channel = _channelMessages[channelId];
+                if (isHidden(channel)) {
+                    console.log("[Hidden Channels Debug] Hidden channel found:", channelId);
+                    // Render HiddenChannel UI for hidden channels
+                    React.createElement(HiddenChannel, { channel });
                 }
             }
         } else {
-            console.log("[Hidden Channels Debug] ChannelMessages not found ❌");
+            console.log("[Hidden Channels Debug] _channelMessages not found in ChannelMessages");
         }
-    }, 10000); // Delay to allow for module load
+    } else {
+        console.log("[Hidden Channels Debug] ChannelMessages not found");
+    }
+
+    // Apply patches for channel permission handling
+    patches.push(after("can", Permissions, ([permID, channel], res) => {
+        if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
+        return res;
+    }));
+
+    patches.push(instead("transitionToGuild", Router, (args, orig) => {
+        const [_, channel] = args;
+        if (!isHidden(channel) && typeof orig === "function") orig(args);
+    }));
+
+    patches.push(instead("fetchMessages", Fetcher, (args, orig) => {
+        const [channel] = args;
+        if (!isHidden(channel) && typeof orig === "function") orig(args);
+    }));
+
+    patches.push(instead("default", MessagesConnected, (args, orig) => {
+        const channel = args[0]?.channel;
+        if (!isHidden(channel) && typeof orig === "function") return orig(...args);
+        else return React.createElement(HiddenChannel, { channel });
+    }));
 }
 
-// Function to check if the channel is hidden (example logic, replace with actual checks)
-function isHidden(channel) {
-    // Check for hidden channels based on your logic (e.g., checking if the channel is in a hidden list)
-    // For now, return true for testing
-    return channel.channelId && channel.channelId === "698490074836238377"; // Modify this check for your needs
-}
-
-// Render the HiddenChannel UI (example)
-function renderHiddenChannelUI(channel) {
-    console.log("[Hidden Channels Debug] Rendering HiddenChannel UI for:", channel);
-    // Insert your UI rendering logic here
-    // For example: React.createElement(HiddenChannel, { channel });
-}
-
-export function onUnload() {
-    console.log("[Hidden Channels Debug] Unloading Hidden Channels plugin.");
-    for (const unpatch of patches) unpatch();
-    patches = [];
+export default {
+    onLoad,
+    onUnload: () => {
+        console.log("[Hidden Channels Debug] onUnload called.");
+        for (const unpatch of patches) unpatch();
+        patches = [];
+    }
 }
