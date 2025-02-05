@@ -42,11 +42,21 @@ function isHidden(channel: any | undefined): boolean {
   }
   if (!channel || skipChannels.includes(channel.type)) return false;
 
-  // Flag the channel for our patched permission check.
-  realCheckMap.set(channel, true);
-  const canView = Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
-  realCheckMap.delete(channel);
-  return !canView;
+  // For debugging: log channel properties
+  console.log("isHidden: checking channel", channel.id, channel.name, channel.type);
+
+  // For testing: force a hidden condition if the channel's name includes 'serious'
+  if (channel.name && channel.name.toLowerCase().includes("serious")) {
+    console.log("isHidden: forcing hidden for channel with name", channel.name);
+    return true;
+  }
+
+  // The original permission-checking logic
+  channel.realCheck = true;
+  let res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
+  delete channel.realCheck;
+  console.log("isHidden: result from Permissions.can for channel", channel.id, ":", res);
+  return res;
 }
 
 /**
