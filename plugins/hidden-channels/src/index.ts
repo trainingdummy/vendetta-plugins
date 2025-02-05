@@ -1,34 +1,45 @@
 import { findByName, findByProps } from "@vendetta/metro";
+import { instead } from "@vendetta/patcher";
+import HiddenChannel from "./HiddenChannel";
 
+let patches = [];
+
+// Find ChannelMessages
 export function onLoad() {
     console.log("[Hidden Channels Debug] Debug script loading...");
 
     setTimeout(() => {
         const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
-        
+
         if (ChannelMessages) {
             console.log("[Hidden Channels Debug] ChannelMessages found ✅");
-            console.log("[Hidden Channels Debug] ChannelMessages properties:", Object.keys(ChannelMessages));
+            
+            if (ChannelMessages.default && ChannelMessages.default._channelMessages) {
+                console.log("[Hidden Channels Debug] _channelMessages found ✅");
 
-            if (ChannelMessages.default) {
-                console.log("[Hidden Channels Debug] ChannelMessages.default found ✅");
-                console.log("[Hidden Channels Debug] ChannelMessages.default properties:", Object.keys(ChannelMessages.default));
+                // Check each channel ID
+                const hiddenChannelIDs = ChannelMessages.default._channelMessages;
+                console.log("[Hidden Channels Debug] Hidden channel IDs:", hiddenChannelIDs);
 
-                if (ChannelMessages.default._channelMessages) {
-                    console.log("[Hidden Channels Debug] ChannelMessages.default._channelMessages found ✅");
-                    console.log("[Hidden Channels Debug] _channelMessages type:", typeof ChannelMessages.default._channelMessages);
-                    console.log("[Hidden Channels Debug] _channelMessages properties:", Object.keys(ChannelMessages.default._channelMessages));
-                } else {
-                    console.log("[Hidden Channels Debug] _channelMessages not found ❌");
-                }
+                // This is where we identify the channels using the IDs
+                hiddenChannelIDs.forEach(channelID => {
+                    console.log("[Hidden Channels Debug] Checking channel ID:", channelID);
+
+                    // Look for the channel by ID
+                    const channel = findByProps(channelID);
+                    if (channel) {
+                        console.log("[Hidden Channels Debug] Hidden channel found:", channel);
+                    } else {
+                        console.log("[Hidden Channels Debug] Channel not found:", channelID);
+                    }
+                });
             }
         } else {
             console.log("[Hidden Channels Debug] ChannelMessages not found ❌");
         }
 
         console.log("[Hidden Channels Debug] Debug script loaded successfully!");
-    }, 10000); // 10-second delay
-
+    }, 1000); // Delay to ensure modules are loaded
 }
 
 export function onUnload() {
