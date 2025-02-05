@@ -4,26 +4,27 @@ import HiddenChannel from "./HiddenChannel";
 
 let patches = [];
 
-const possibleModules = [
+export function onLoad() {
+
+    const possibleModules = [
     "MessagesWrapperConnected",
     "ChannelMessages",
     "MessageActionCreators",
     "MessagePreviewStore",
     "GuildBasicChannels",
     "ChannelStore"
-];
+    ];
 
-for (const mod of possibleModules) {
-    const found = vendetta.modules.findByName(mod, false) || vendetta.modules.findByProps(mod);
-    console.log(`[Hidden Channels Debug] ${mod}:`, found);
-}
-
-const ChannelMessages = vendetta.modules.findByName("ChannelMessages", false) || vendetta.modules.findByProps("ChannelMessages");
-
-console.log("[Hidden Channels Debug] ChannelMessages:", ChannelMessages);
-console.log("[Hidden Channels Debug] ChannelMessages prototype:", ChannelMessages?.prototype);
-
-export function onLoad() {
+    for (const mod of possibleModules) {
+        const found = vendetta.modules.findByName(mod, false) || vendetta.modules.findByProps(mod);
+        console.log(`[Hidden Channels Debug] ${mod}:`, found);
+    }
+    
+    const ChannelMessages = vendetta.modules.findByName("ChannelMessages", false) || vendetta.modules.findByProps("ChannelMessages");
+    
+    console.log("[Hidden Channels Debug] ChannelMessages:", ChannelMessages);
+    console.log("[Hidden Channels Debug] ChannelMessages prototype:", ChannelMessages?.prototype);
+    
     const MessagesWrapperConnected = findByName("MessagesWrapperConnected", false);
     if (!MessagesWrapperConnected) {
         console.error("Hidden Channels plugin: 'MessagesWrapperConnected' component not found.");
