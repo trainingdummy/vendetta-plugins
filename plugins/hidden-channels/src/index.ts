@@ -1,10 +1,11 @@
 import { findByName, findByProps } from "@vendetta/metro";
 import { constants, React } from "@vendetta/metro/common";
 import { instead, after } from "@vendetta/patcher";
-import HiddenChannel from "./HiddenChannel";
+import HiddenChannel from "./HiddenChannel";  // Ensure this file exists and is properly defined.
 
 let patches = [];
 
+// Find core modules necessary for operation
 const Permissions = findByProps("getChannelPermissions", "can");
 const Router = findByProps("transitionToGuild");
 const Fetcher = findByProps("stores", "fetchMessages");
@@ -18,9 +19,8 @@ const skipChannels = [
 ];
 
 function isHidden(channel: any | undefined) {
-    if (channel == undefined) return false;
-    if (typeof channel === 'string')
-        channel = getChannel(channel);
+    if (!channel) return false;
+    if (typeof channel === 'string') channel = getChannel(channel);
     if (!channel || skipChannels.includes(channel.type)) return false;
 
     channel.realCheck = true;
@@ -30,17 +30,17 @@ function isHidden(channel: any | undefined) {
 }
 
 export function onLoad() {
-    console.log("[Hidden Channels Debug] onLoad started");
+    console.log("[Hidden Channels Debug] Plugin loading...");
 
-    // Find MessagesWrapperConnected and log it
+    // Check for MessagesWrapperConnected module
     const MessagesConnected = findByName("MessagesWrapperConnected", false);
-    if (MessagesConnected) {
-        console.log("[Hidden Channels Debug] MessagesWrapperConnected found");
-    } else {
-        console.log("[Hidden Channels Debug] MessagesWrapperConnected not found");
+    if (!MessagesConnected) {
+        console.error("[Hidden Channels Debug] MessagesWrapperConnected not found!");
+        return;
     }
+    console.log("[Hidden Channels Debug] MessagesWrapperConnected found");
 
-    // Find and log the ChannelMessages module (check for hidden channels here)
+    // Check for ChannelMessages module and handle it
     const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
     if (ChannelMessages) {
         console.log("[Hidden Channels Debug] ChannelMessages found");
@@ -48,14 +48,14 @@ export function onLoad() {
         const _channelMessages = ChannelMessages?.default?._channelMessages;
         if (_channelMessages) {
             const channelIds = Object.keys(_channelMessages);
-            console.log("[Hidden Channels Debug] Channel IDs found:", channelIds);
+            console.log("[Hidden Channels Debug] Found channel IDs:", channelIds);
 
-            // Loop through channel IDs and check for hidden ones
+            // Loop through the channel IDs and check if they are hidden
             for (const channelId of channelIds) {
                 const channel = _channelMessages[channelId];
                 if (isHidden(channel)) {
                     console.log("[Hidden Channels Debug] Hidden channel found:", channelId);
-                    // Render HiddenChannel UI for hidden channels
+                    // If the channel is hidden, render the HiddenChannel UI
                     React.createElement(HiddenChannel, { channel });
                 }
             }
@@ -66,33 +66,38 @@ export function onLoad() {
         console.log("[Hidden Channels Debug] ChannelMessages not found");
     }
 
-    // Apply patches for channel permission handling
+    // Patch permissions
     patches.push(after("can", Permissions, ([permID, channel], res) => {
         if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
         return res;
     }));
 
+    // Patch router behavior to prevent navigation to hidden channels
     patches.push(instead("transitionToGuild", Router, (args, orig) => {
         const [_, channel] = args;
         if (!isHidden(channel) && typeof orig === "function") orig(args);
     }));
 
+    // Patch message fetching to avoid fetching from hidden channels
     patches.push(instead("fetchMessages", Fetcher, (args, orig) => {
         const [channel] = args;
         if (!isHidden(channel) && typeof orig === "function") orig(args);
     }));
 
+    // Patch message rendering to show HiddenChannel UI for hidden channels
     patches.push(instead("default", MessagesConnected, (args, orig) => {
         const channel = args[0]?.channel;
         if (!isHidden(channel) && typeof orig === "function") return orig(...args);
         else return React.createElement(HiddenChannel, { channel });
     }));
+
+    console.log("[Hidden Channels Debug] Plugin loaded successfully.");
 }
 
 export default {
     onLoad,
     onUnload: () => {
-        console.log("[Hidden Channels Debug] onUnload called.");
+        console.log("[Hidden Channels Debug] Plugin unloading...");
         for (const unpatch of patches) unpatch();
         patches = [];
     }
