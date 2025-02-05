@@ -3,6 +3,52 @@ import { constants, React } from "@vendetta/metro/common";
 import { instead, after } from "@vendetta/patcher";
 import HiddenChannel from "./HiddenChannel";
 
+// Array of candidate module names to test:
+const candidateNames = [
+  "MessagesWrapperConnected",
+  "ChannelMessages",
+  "ChannelReader",
+  "GuildBasicChannels",
+  "MessageActionCreators",
+  "MessagePreviewStore",
+  "ChannelStore"
+];
+
+let targetComponent = null;
+
+for (const name of candidateNames) {
+  const mod = findByName(name, false);
+  if (mod) {
+    console.log(`Found candidate component: ${name}`);
+    // Optionally, log some properties to check if it seems like a React component.
+    console.log("Candidate prototype:", mod.prototype);
+    targetComponent = mod;
+    break;
+  } else {
+    console.log(`Candidate component ${name} not found.`);
+  }
+}
+
+if (!targetComponent) {
+  console.error("Hidden Channels plugin: No suitable messages component found!");
+  // Depending on your preference, you might return or continue with fallback logic.
+} else {
+  // Patch the found component.
+  patches.push(instead("default", targetComponent, (args, orig) => {
+    const channel = args[0]?.channel;
+    // For testing: if channel name contains "serious", force the HiddenChannel UI.
+    if (channel && channel.name && channel.name.toLowerCase().includes("serious")) {
+      console.log("Forcing HiddenChannel UI for channel:", channel.name);
+      return React.createElement(HiddenChannel, { channel });
+    }
+    if (!isHidden(channel) && typeof orig === "function") {
+      return orig(...args);
+    } else {
+      return React.createElement(HiddenChannel, { channel });
+    }
+  }));
+}
+
 // Store unpatch functions here so we can clean up on unload.
 let patches: Array<() => void> = [];
 
