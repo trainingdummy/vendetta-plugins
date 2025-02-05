@@ -1,15 +1,13 @@
-import { lazyDestructure, findByProps } from "@vendetta/metro";
+import { findByName, findByProps } from "@vendetta/metro";
 import { instead } from "@vendetta/patcher";
 import HiddenChannel from "./HiddenChannel";
 
 let patches = [];
 
 export function onLoad() {
-    // Reverting back to the original approach, but integrating `lazyDestructure`
-    const MessagesWrapperConnected = lazyDestructure(() => findByProps("MessagesWrapperConnected"));
-    
+    const MessagesWrapperConnected = findByName("MessagesWrapperConnected", false);
     if (!MessagesWrapperConnected) {
-        console.error("Hidden Channels plugin: Could not find MessagesWrapperConnected.");
+        console.error("Hidden Channels plugin: 'MessagesWrapperConnected' component not found.");
         return;
     }
 
