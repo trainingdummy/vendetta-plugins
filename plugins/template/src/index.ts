@@ -1,67 +1,62 @@
-import { stylesheet, constants, moment, toasts, clipboard } from "@vendetta/metro/common";
-import { findByProps } from "@vendetta/metro";
-import { semanticColors } from '@vendetta/ui';
-import { getAssetByName } from "@vendetta/ui/assets";
+import { findByName, findByProps } from "@vendetta/metro";
+import { constants, React } from "@vendetta/metro/common";
+import { instead, after } from "@vendetta/patcher";
+import HiddenChannel from "./HiddenChannel";
 
-const {View, Text, Pressable } = findByProps("Button", "Text", "View");
+let patches = [];
 
-const snowflakeUtils = findByProps("extractTimestamp");
+const Permissions = findByProps("getChannelPermissions", "can");
+const Router = findByProps("transitionToGuild");
+const Fetcher = findByProps("stores", "fetchMessages");
+const { ChannelTypes } = findByProps("ChannelTypes");
+const {getChannel} = findByProps("getChannel");
 
-const MessageStyles = stylesheet.createThemedStyleSheet({
-    'container': {
-        'flex': 1,
-        'padding': 16,
-        'alignItems': 'center',
-        'justifyContent': 'center',
-    },
-    'title': {
-        'fontFamily': constants.Fonts.PRIMARY_SEMIBOLD,
-        'fontSize': 24,
-        'textAlign': 'left',
-        'color': semanticColors.HEADER_PRIMARY,
-        'paddingVertical': 25
-    },
-    'text': {
-        'flex': 1,
-        'flexDirection': 'row',
-        'fontSize': 16,
-        'textAlign': 'justify',
-        'color': semanticColors.HEADER_PRIMARY,
-    },
-    'dateContainer': {
-        'height': 16,
-        'alignSelf': 'baseline'
-    }
-})
+const skipChannels = [
+    ChannelTypes.DM, 
+    ChannelTypes.GROUP_DM, 
+    ChannelTypes.GUILD_CATEGORY
+]
 
-function FancyDate({date}) {
-    return (
-        <Pressable style={MessageStyles.dateContainer} onPress={() => {
-            toasts.open({
-                content: moment(date).toLocaleString(),
-                source: getAssetByName("clock").id
-            })
-        }}
-        onLongPress={() => {
-            clipboard.setString(date.getTime().toString())
-            toasts.open({ content: "Copied to clipboard" })
-        }}>
-            <Text style={MessageStyles.text}>{moment(date).fromNow()}</Text>
-        </Pressable>
-    )
+function isHidden(channel: any | undefined) {
+    if (channel == undefined) return false;
+    if (typeof channel === 'string')
+        channel = getChannel(channel);
+    if (!channel || skipChannels.includes(channel.type)) return false;
+    channel.realCheck = true;
+    let res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
+    delete channel.realCheck;
+    return res;
+}
+function onLoad() {
+    const MessagesConnected = findByName("MessagesWrapperConnected", false);
+    
+    patches.push(after("can", Permissions, ([permID, channel], res) => {
+        if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
+        return res;
+    }));
+
+    patches.push(instead("transitionToGuild", Router, (args, orig) => {
+        const [_, channel] = args;
+        if (!isHidden(channel) && typeof orig === "function") orig(args);
+    }));
+
+    patches.push(instead("fetchMessages", Fetcher, (args, orig) => {
+        const [channel] = args;
+        if (!isHidden(channel) && typeof orig === "function") orig(args);
+    }));
+
+    patches.push(instead("default", MessagesConnected, (args, orig) => {
+        const channel = args[0]?.channel;
+        if (!isHidden(channel) && typeof orig === "function") return orig(...args);
+        else return React.createElement(HiddenChannel, {channel});
+    }));
 }
 
-export default function HiddenChannel({channel}) {
-    return <View style={MessageStyles.container}>
-        <Text style={MessageStyles.title}>This channel is hidden.</Text>
-        <Text style={MessageStyles.text}>
-            Topic: {channel.topic || "No topic."}
-            {"\n\n"}
-            Creation date: <FancyDate date={new Date(snowflakeUtils.extractTimestamp(channel.id))} />
-            {"\n\n"}
-            Last message: {channel.lastMessageId ? <FancyDate date={new Date(snowflakeUtils.extractTimestamp(channel.lastMessageId))} /> : "No messages."}
-            {"\n\n"}
-            Last pin: {channel.lastPinTimestamp ? <FancyDate date={new Date(channel.lastPinTimestamp)} /> : "No pins."}
-        </Text>
-    </View>
+export default {
+    onLoad,
+    onUnload: () => {
+        for (const unpatch of patches) {
+            unpatch();
+        };
+    }
 }
