@@ -4,4 +4,4 @@ This repo contains a template for creating [Vendetta](https://github.com/vendett
 # How to install?
 Paste the plugin URL into the Plugins page of Vendetta, following a format of:
 
-https://trainingdummy.github.io/vendetta-plugins/hidden-channel
+https://trainingdummy.github.io/vendetta-plugins/hidden-channels
