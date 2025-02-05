@@ -4,31 +4,30 @@ export function onLoad() {
     console.log("[Hidden Channels Debug] Debug script loading...");
 
     setTimeout(() => {
-        const possibleModules = [
-            "MessagesWrapperConnected",
-            "ChannelMessages",
-            "MessageActionCreators",
-            "MessagePreviewStore",
-            "GuildBasicChannels",
-            "ChannelStore"
-        ];
+        const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
+        
+        if (ChannelMessages) {
+            console.log("[Hidden Channels Debug] ChannelMessages found ✅");
+            console.log("[Hidden Channels Debug] ChannelMessages properties:", Object.keys(ChannelMessages));
 
-        for (const mod of possibleModules) {
-            const found = findByName(mod, false) || findByProps(mod);
-            console.log(`[Hidden Channels Debug] ${mod}:`, found ? "Found ✅" : "Not Found ❌");
+            if (ChannelMessages.default) {
+                console.log("[Hidden Channels Debug] ChannelMessages.default found ✅");
+                console.log("[Hidden Channels Debug] ChannelMessages.default properties:", Object.keys(ChannelMessages.default));
 
-            if (found) {
-                console.log(`[Hidden Channels Debug] ${mod} properties:`, Object.keys(found));
-
-                // Check if there's a "default" property and log its keys too
-                if (found.default) {
-                    console.log(`[Hidden Channels Debug] ${mod}.default properties:`, Object.keys(found.default));
+                if (ChannelMessages.default._channelMessages) {
+                    console.log("[Hidden Channels Debug] ChannelMessages.default._channelMessages found ✅");
+                    console.log("[Hidden Channels Debug] _channelMessages type:", typeof ChannelMessages.default._channelMessages);
+                    console.log("[Hidden Channels Debug] _channelMessages properties:", Object.keys(ChannelMessages.default._channelMessages));
+                } else {
+                    console.log("[Hidden Channels Debug] _channelMessages not found ❌");
                 }
             }
+        } else {
+            console.log("[Hidden Channels Debug] ChannelMessages not found ❌");
         }
 
         console.log("[Hidden Channels Debug] Debug script loaded successfully!");
-    }, 1000); // 1-second delay
+    }, 10000); // 10-second delay
 
 }
 
