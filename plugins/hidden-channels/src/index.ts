@@ -13,33 +13,27 @@ export function onLoad() {
 
         if (ChannelMessages) {
             console.log("[Hidden Channels Debug] ChannelMessages found ✅");
-            
+
             if (ChannelMessages.default && ChannelMessages.default._channelMessages) {
                 console.log("[Hidden Channels Debug] _channelMessages found ✅");
 
-                // Check each channel ID
+                // Check the list of hidden channel IDs
                 const hiddenChannelIDs = ChannelMessages.default._channelMessages;
                 console.log("[Hidden Channels Debug] Hidden channel IDs:", hiddenChannelIDs);
-
-                // This is where we identify the channels using the IDs
+                
+                // Just log the IDs and stop here for now
                 hiddenChannelIDs.forEach(channelID => {
-                    console.log("[Hidden Channels Debug] Checking channel ID:", channelID);
-
-                    // Look for the channel by ID
-                    const channel = findByProps(channelID);
-                    if (channel) {
-                        console.log("[Hidden Channels Debug] Hidden channel found:", channel);
-                    } else {
-                        console.log("[Hidden Channels Debug] Channel not found:", channelID);
-                    }
+                    console.log("[Hidden Channels Debug] Channel ID:", channelID);
                 });
+            } else {
+                console.log("[Hidden Channels Debug] No _channelMessages property found ❌");
             }
         } else {
             console.log("[Hidden Channels Debug] ChannelMessages not found ❌");
         }
 
         console.log("[Hidden Channels Debug] Debug script loaded successfully!");
-    }, 1000); // Delay to ensure modules are loaded
+    }, 10000); // Delay to ensure modules are loaded
 }
 
 export function onUnload() {
