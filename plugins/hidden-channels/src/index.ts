@@ -32,6 +32,14 @@ function isHidden(channel: any | undefined) {
 export function onLoad() {
     console.log("[Hidden Channels Debug] onLoad started");
 
+    // Find MessagesWrapperConnected and log it
+    const MessagesConnected = findByName("MessagesWrapperConnected", false);
+    if (MessagesConnected) {
+        console.log("[Hidden Channels Debug] MessagesWrapperConnected found");
+    } else {
+        console.log("[Hidden Channels Debug] MessagesWrapperConnected not found");
+    }
+
     // Find and log the ChannelMessages module (check for hidden channels here)
     const ChannelMessages = findByName("ChannelMessages", false) || findByProps("ChannelMessages");
     if (ChannelMessages) {
