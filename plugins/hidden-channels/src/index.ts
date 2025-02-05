@@ -1,11 +1,11 @@
-import { findByProps, findByName } from "@vendetta/metro";
+import { findByName, findByProps } from "@vendetta/metro";
 import { constants, React } from "@vendetta/metro/common";
 import { instead, after } from "@vendetta/patcher";
 import HiddenChannel from "./HiddenChannel";
 
 let patches = [];
-let visibilityState = {};
 
+// Get necessary Vendetta modules
 const Permissions = findByProps("getChannelPermissions", "can");
 const Router = findByProps("transitionToGuild");
 const Fetcher = findByProps("stores", "fetchMessages");
@@ -18,9 +18,11 @@ const skipChannels = [
     ChannelTypes.GUILD_CATEGORY
 ];
 
-function isHidden(channel) {
-    if (!channel) return false;
-    if (typeof channel === 'string') channel = getChannel(channel);
+// Function to check if the channel is hidden
+function isHidden(channel: any | undefined) {
+    if (channel == undefined) return false;
+    if (typeof channel === 'string')
+        channel = getChannel(channel);
     if (!channel || skipChannels.includes(channel.type)) return false;
     channel.realCheck = true;
     let res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
@@ -34,7 +36,10 @@ function onLoad() {
         console.error("Hidden Channels plugin: 'ChannelMessages' module not found.");
         return;
     }
+    
+    console.log("[Hidden Channels Debug] ChannelMessages:", ChannelMessages);
 
+    // Patching methods for controlling behavior
     patches.push(after("can", Permissions, ([permID, channel], res) => {
         if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
         return res;
@@ -57,14 +62,11 @@ function onLoad() {
     }));
 }
 
-function onUnload() {
-    for (const unpatch of patches) {
-        unpatch();
-    }
-    // Additional cleanup logic if needed
-}
-
 export default {
     onLoad,
-    onUnload
-};
+    onUnload: () => {
+        for (const unpatch of patches) {
+            unpatch();
+        };
+    }
+}
