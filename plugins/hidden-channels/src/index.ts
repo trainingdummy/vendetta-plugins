@@ -2,15 +2,16 @@ import { findByName, findByProps, instead, after } from "@vendetta/patcher";
 import { constants, React } from "@vendetta/metro/common";
 import HiddenChannel from "./HiddenChannel";
 
-let patches = [];
+let patches: Array<() => void> = [];
 
-// Lookup internal modules for permissions and channel retrieval.
+// Lookup modules for permissions and channel retrieval.
 const Permissions = findByProps("getChannelPermissions", "can");
 const Router = findByProps("transitionToGuild");
 const Fetcher = findByProps("stores", "fetchMessages");
 const { ChannelTypes } = findByProps("ChannelTypes");
 const { getChannel } = findByProps("getChannel");
 
+// Define channel types that should be skipped.
 const skipChannels = [
   ChannelTypes.DM,
   ChannelTypes.GROUP_DM,
@@ -18,75 +19,104 @@ const skipChannels = [
 ];
 
 /**
- * Checks whether a given channel is hidden.
+ * isHidden determines whether a channel should be considered hidden.
  * If a string is provided, it resolves it via getChannel.
  */
 function isHidden(channel: any | undefined): boolean {
-  if (channel == undefined) return false;
+  if (!channel) return false;
   if (typeof channel === "string") channel = getChannel(channel);
   if (!channel || skipChannels.includes(channel.type)) return false;
-  
-  // Tag the channel so that the patched Permissions.can will treat it differently.
+  // Tag the channel so our patched Permissions.can knows it's under test.
   channel.realCheck = true;
-  let res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
+  const res = !Permissions.can(constants.Permissions.VIEW_CHANNEL, channel);
   delete channel.realCheck;
-  
-  // Debug log:
   console.log(`isHidden: channel ${channel?.id} hidden? ${res}`);
   return res;
 }
 
+/**
+ * onLoad patches the messages container component.
+ * We search for candidate modules, and if one is found, patch its render.
+ * If none is found, we log an error but do not disable the plugin.
+ */
 function onLoad() {
-  // Look up the original messages container component.
-  const MessagesConnected = findByName("MessagesWrapperConnected", false);
-  if (!MessagesConnected) {
-    console.error("Hidden Channels plugin: 'MessagesWrapperConnected' component not found");
-    return;
+  // List candidate names to try (prioritizing those we suspect).
+  const candidates = [
+    "MessagesWrapperConnected",
+    "ChannelReader",
+    "MessagesList",
+    "ChannelMessages"
+  ];
+  let targetComponent = null;
+  for (const name of candidates) {
+    targetComponent = findByName(name, false);
+    if (targetComponent) {
+      console.log(`Hidden Channels plugin: Found candidate component: ${name}`);
+      break;
+    } else {
+      console.log(`Hidden Channels plugin: Candidate ${name} not found.`);
+    }
   }
   
-  // Patch Permissions.can to force view permission when our check is in effect.
-  patches.push(after("can", Permissions, ([permID, channel], res) => {
-    if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
-    return res;
-  }));
-  
+  if (!targetComponent) {
+    console.error("Hidden Channels plugin: No suitable messages component found. Plugin enabled but will not patch UI.");
+  } else {
+    patches.push(
+      instead("default", targetComponent, (args, orig) => {
+        const channel = args[0]?.channel;
+        if (!isHidden(channel) && typeof orig === "function") {
+          return orig(...args);
+        } else {
+          console.log("Hidden Channels plugin: Rendering HiddenChannel UI for channel:", channel?.id);
+          return React.createElement(HiddenChannel, { channel });
+        }
+      })
+    );
+  }
+
+  // Patch Permissions.can to force view permission when not in a real check.
+  patches.push(
+    after("can", Permissions, ([permID, channel], res) => {
+      if (!channel?.realCheck && permID === constants.Permissions.VIEW_CHANNEL) return true;
+      return res;
+    })
+  );
+
   // Patch Router.transitionToGuild to block navigation if the channel is hidden.
-  patches.push(instead("transitionToGuild", Router, (args, orig) => {
-    const [_, channel] = args;
-    if (!isHidden(channel) && typeof orig === "function") {
-      orig(args);
-    } else {
-      console.log("Blocked transition to hidden channel:", channel?.id);
-    }
-  }));
-  
+  patches.push(
+    instead("transitionToGuild", Router, (args, orig) => {
+      const [_, channel] = args;
+      if (!isHidden(channel) && typeof orig === "function") {
+        orig(args);
+      } else {
+        console.log("Hidden Channels plugin: Blocked navigation to hidden channel:", channel?.id);
+      }
+    })
+  );
+
   // Patch Fetcher.fetchMessages to block message fetching for hidden channels.
-  patches.push(instead("fetchMessages", Fetcher, (args, orig) => {
-    const [channel] = args;
-    if (!isHidden(channel) && typeof orig === "function") {
-      orig(args);
-    } else {
-      console.log("Blocked fetching messages for hidden channel:", channel?.id);
-    }
-  }));
-  
-  // Patch the default render of the messages container.
-  patches.push(instead("default", MessagesConnected, (args, orig) => {
-    const channel = args[0]?.channel;
-    if (!isHidden(channel) && typeof orig === "function") {
-      return orig(...args);
-    } else {
-      console.log("Rendering HiddenChannel UI for channel:", channel?.id);
-      return React.createElement(HiddenChannel, { channel });
-    }
-  }));
+  patches.push(
+    instead("fetchMessages", Fetcher, (args, orig) => {
+      const [channel] = args;
+      if (!isHidden(channel) && typeof orig === "function") {
+        orig(args);
+      } else {
+        console.log("Hidden Channels plugin: Blocked fetching messages for hidden channel:", channel?.id);
+      }
+    })
+  );
+}
+
+/**
+ * onUnload unpatches all applied patches.
+ */
+function onUnload() {
+  for (const unpatch of patches) {
+    unpatch();
+  }
 }
 
 export default {
   onLoad,
-  onUnload: () => {
-    for (const unpatch of patches) {
-      unpatch();
-    }
-  }
+  onUnload
 };
